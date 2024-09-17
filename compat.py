@@ -7,7 +7,7 @@ import threading
 import time
 from dataclasses import dataclass
 from heapq import heappop, heappush
-from queue import Empty, PriorityQueue, Queue
+from queue import Empty, Queue
 from typing import Any, Optional
 
 

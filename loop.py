@@ -58,7 +58,6 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
 
     def stop(self):
         self._stopping = True
-        # self.readyq.put(StopException())
 
     def close(self):
         self._closed = True
@@ -73,8 +72,6 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
         asyncio.events._set_running_loop(loop)
         loop._run_once()
 
-    def running_on_main_thread(self):
-        return threading.get_ident() == self.main_thread
 
     def run_forever(self):
         """Run until stop() is called."""
@@ -89,22 +86,12 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
             _set_running_loop(self)
             _get_running_loop()
             while not self._stopping:
-                if self.readyq.qsize() == 0:
-                    if (
-                        self._scheduled.qsize() == 0
-                        and self.schedule_thread.sorted_scheduled.is_empty()
-                        and self.readyq.qsize() == 0
-                    ):
-                        print("breaking")
-                        pass
-                        # time.sleep(0.5)
-                        # break
 
                 num_jobs = self.readyq.qsize()
-                num_workers = num_jobs - 1 if num_jobs > 1 else 1
-                # num_workers=min(self.nworkers,num_jobs)
+                # num_workers = num_jobs - 1 if num_jobs > 1 else 1
+                num_workers=min(self.nworkers,num_jobs)
                 # print(self.readyq.readyqqueue)
-                self.selector_thread.run_once()
+                # self.selector_thread.run_once()
                 # self._run_once()
                 [
                     x
@@ -132,7 +119,6 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
         'call_later' callbacks.
         """
         handle = self.readyq.get(timeout=None, block=True)
-        print("RUNNING handle",handle)
         if not handle._cancelled:
             handle._run()
         handle = None
@@ -144,7 +130,7 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
         """
         self._check_closed()
         if self._task_factory is None:
-            task = tasks.Task(coro, loop=self, name=name, context=context)
+            task = tasks.CustomTask(coro, loop=self, name=name, context=context)
             if task._source_traceback:
                 del task._source_traceback[-1]
         else:
