@@ -10,6 +10,7 @@ class User(BaseModel):
     first_name: str
     last_name: str
 
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}

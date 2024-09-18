@@ -2,16 +2,13 @@ import heapq
 import asyncio
 from threading import RLock
 from selectors import BaseSelector
-import queue
 import threading
 import time
-from dataclasses import dataclass
-from heapq import heappop, heappush
 from queue import Empty, Queue
-from typing import Any, Optional
+from typing import Optional
 
 
-class FastPriorityQueue:
+class SimplePriorityQueue:
     def __init__(self):
         self.heap = []
 
@@ -40,23 +37,19 @@ class ScheduleThread:
         if scheduled_queue is None:
             scheduled_queue = Queue()
         self.scheduled = scheduled_queue
-        self.sorted_scheduled = FastPriorityQueue()
+        self.sorted_scheduled = SimplePriorityQueue()
         self.ready = ready_queue
         self._clock_resolution = time.get_clock_info("monotonic").resolution
         self.handle = None
+
     def time(self):
         return time.monotonic()
 
     def wait_for_new_scheduled_items(self, timeout=None):
-        # print("WAITNGING", timeout, threading.get_ident())
-        # print(self.sorted_scheduled.heap)
-
         try:
             event = self.scheduled.get(block=True, timeout=timeout)
         except Empty:
-            # print("EMPTY")
             return
-        # print("GOT SCHEDULED", event)
         self.sorted_scheduled.push(item=event)
         return
 
@@ -64,7 +57,6 @@ class ScheduleThread:
         curr_time = self.time() + self._clock_resolution
         while not self.sorted_scheduled.is_empty():
             handle = self.sorted_scheduled.peek()
-            # print("COMPARE", curr_time, handle._when)
             if handle._when >= curr_time:
                 break
             handle = self.sorted_scheduled.pop()
@@ -82,7 +74,6 @@ class ScheduleThread:
     def close(self):
         with self.scheduled.mutex:
             self.scheduled.queue.clear()
-        # self.handle.join(timeout=0.001)
 
     def run_forever_in_thread(self):
         self.handle = threading.Thread(target=self.run_forever)
@@ -103,7 +94,7 @@ class SelectorThread:
         loop: asyncio.BaseEventLoop,
     ):
         self.ready = ready_queue
-        self.selector=selector
+        self.selector = selector
         self.lock = selector_lock
         self.loop = loop
 
@@ -111,6 +102,7 @@ class SelectorThread:
         event_list = self.selector.select(timeout=0)
         with self.lock:
             self.loop._process_events(event_list)
+
     def run_forever(self):
         while True:
             event_list = self.selector.select(timeout=None)
@@ -118,9 +110,7 @@ class SelectorThread:
                 self.loop._process_events(event_list)
             event_list = None
 
-
     def run_forever_in_thread(self):
         self.handle = threading.Thread(target=self.run_forever)
         self.handle.daemon = True
         self.handle.start()
-

@@ -12,22 +12,26 @@ class HTTPparser:
 
     def parse_request(self, http_data):
         try:
-            request, headers_body = http_data.split(b'\r\n', 1)
-            self.request["method"], self.request["path"], type_version = request.split(b' ')
-            *headers, self.request["body"] = headers_body.split(b'\r\n')
-            self.request["type"], self.request["http_version"] = type_version.split(b'/')
+            request, headers_body = http_data.split(b"\r\n", 1)
+            self.request["method"], self.request["path"], type_version = request.split(
+                b" "
+            )
+            *headers, self.request["body"] = headers_body.split(b"\r\n")
+            self.request["type"], self.request["http_version"] = type_version.split(
+                b"/"
+            )
 
             formatted_headers = []
             for header in headers:
                 try:
-                    key, val = header.split(b':', maxsplit=1)
+                    key, val = header.split(b":", maxsplit=1)
                     val = val.strip()
                     formatted_headers.append((key, val))
-                except Exception as e:
+                except Exception:
                     pass
             self.request["headers"] = formatted_headers
 
-        except Exception as e:
+        except Exception:
             raise HttpParserError()
 
     def serialize_http_response(self, asgi_responses):
@@ -47,24 +51,26 @@ class HTTPparser:
 
             elif response_type == "http.response.body":
                 http_response += b"\r\n".join(
-                    [f"{key.decode()}: {value.decode()}".encode() for key, value in headers.items()])
+                    [
+                        f"{key.decode()}: {value.decode()}".encode()
+                        for key, value in headers.items()
+                    ]
+                )
                 http_response += b"\r\n\r\n" + response.get("body", b"")
 
         return http_response
 
+
 class ASGIspec:
     def __init__(self, http_parse: HTTPparser):
         self.scope: dict = {
-            'asgi': {
-                'version': '3.0',
-                'spec_version': '2.0'
-            },
-            'method': http_parse.request['method'].decode(),
-            'type': http_parse.request['type'].decode().lower(),
-            'http_version': http_parse.request['http_version'].decode(),
-            'path': http_parse.request['path'].decode(),
-            'headers': http_parse.request['headers'],
-            'query_string': b'',
+            "asgi": {"version": "3.0", "spec_version": "2.0"},
+            "method": http_parse.request["method"].decode(),
+            "type": http_parse.request["type"].decode().lower(),
+            "http_version": http_parse.request["http_version"].decode(),
+            "path": http_parse.request["path"].decode(),
+            "headers": http_parse.request["headers"],
+            "query_string": b"",
         }
         self.http_parse = http_parse.request
         self.response = []
@@ -75,13 +81,13 @@ class ASGIspec:
 
     async def send(self, message):
         self.response.append(message)
-        if message.get('type') == "http.response.body":
+        if message.get("type") == "http.response.body":
             self.response_event.set()
 
     async def receive(self):
         message = {
             "type": "http.request",
-            "body": self.http_parse['body'],
+            "body": self.http_parse["body"],
             "more_body": False,
         }
         return message

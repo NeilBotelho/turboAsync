@@ -1,17 +1,14 @@
 import asyncio
-import tasks
 import sys
 import threading
-import time
 from asyncio.events import Handle, _get_running_loop, _set_running_loop
 from concurrent.futures import ThreadPoolExecutor
-from contextvars import ContextVar
 from queue import Queue
 
 import sniffio
 
-from compat import ScheduleThread, SelectorThread
-
+from turboasync import tasks
+from turboasync.utils import ScheduleThread, SelectorThread
 
 
 class CustomPolicy(asyncio.unix_events._UnixDefaultEventLoopPolicy):
@@ -24,8 +21,6 @@ class CustomPolicy(asyncio.unix_events._UnixDefaultEventLoopPolicy):
         if self.loop is None:
             return CustomEventLoop()
         return self.loop
-
-
 
 
 class CustomEventLoop(asyncio.SelectorEventLoop):
@@ -42,7 +37,12 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
             ready_queue=self.readyq, scheduled_queue=self._scheduled
         )
         self.schedule_thread.run_forever_in_thread()
-        self.selector_thread=SelectorThread(ready_queue=self.readyq,selector=self._selector,selector_lock=threading.RLock(),loop=self)
+        self.selector_thread = SelectorThread(
+            ready_queue=self.readyq,
+            selector=self._selector,
+            selector_lock=threading.RLock(),
+            loop=self,
+        )
         self.selector_thread.run_forever_in_thread()
         sniffio.current_async_library_cvar.set("asyncio")
 
@@ -72,7 +72,6 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
         asyncio.events._set_running_loop(loop)
         loop._run_once()
 
-
     def run_forever(self):
         """Run until stop() is called."""
         self._check_closed()
@@ -88,11 +87,7 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
             while not self._stopping:
 
                 num_jobs = self.readyq.qsize()
-                # num_workers = num_jobs - 1 if num_jobs > 1 else 1
-                num_workers=min(self.nworkers,num_jobs)
-                # print(self.readyq.readyqqueue)
-                # self.selector_thread.run_once()
-                # self._run_once()
+                num_workers = min(self.nworkers, num_jobs)
                 [
                     x
                     for x in self.pool.map(
@@ -122,28 +117,6 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
         if not handle._cancelled:
             handle._run()
         handle = None
-    
-    def create_task(self, coro, *, name=None, context=None):
-        """Schedule a coroutine object.
-
-        Return a task object.
-        """
-        self._check_closed()
-        if self._task_factory is None:
-            task = tasks.CustomTask(coro, loop=self, name=name, context=context)
-            if task._source_traceback:
-                del task._source_traceback[-1]
-        else:
-            if context is None:
-                # Use legacy API if context is not needed
-                task = self._task_factory(self, coro)
-            else:
-                task = self._task_factory(self, coro, context=context)
-
-            task.set_name(name)
-
-        return task
-
 
     def _add_callback(self, handle):
         """Add a Handle to _ready."""
@@ -156,11 +129,12 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
         Return a task object.
         """
         self._check_closed()
-        task = tasks.Task(coro, loop=self, name=name, context=context)
+        task = tasks.CustomTask(coro, loop=self, name=name, context=context)
         if task._source_traceback:
             del task._source_traceback[-1]
 
         return task
+
     def _call_soon(self, callback, args, context):
         handle = Handle(callback, args, self, context)
         if handle._source_traceback:
@@ -178,4 +152,3 @@ class CustomEventLoop(asyncio.SelectorEventLoop):
         self._scheduled.put(timer, block=True)
         timer._scheduled = True
         return timer
-
