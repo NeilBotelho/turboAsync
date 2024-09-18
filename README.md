@@ -9,7 +9,10 @@ The only thing you'll need is the free threaded Python 3.13 release. I recommend
 ```bash
 pyenv install 3.13t-dev
 ```
-
+Then you can just install this package by running the following from the top level of the git repo:
+```bash
+pip install -e . 
+```
 # How to try it out:
 I have a couple of scripts in the tests folder that you can use to test out basic functionality as well as a basic fastapi server. 
 Feel free to submit more interesting tests as PR's and open issues that you come across. I won't commit to fixing them, but it'll be useful to others looking at this.
